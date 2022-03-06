@@ -23,8 +23,8 @@ nbf: nbf.o
 clean:
 	rm -rf reg_rw *.o *.bin dma_to_device dma_from_device performance *.riscv *.word *.nbf *.mem
 
-BLACKPARROT_RTL_DIR ?= $(HOME)/scratch/bsg_fpga/vu37p/rtl
-BLACKPARROT_SDK_DIR ?= $(HOME)/scratch/bsg_fpga/vu37p/sdk
+BLACKPARROT_RTL_DIR ?= $(HOME)/black-parrot/bsg_fpga/vcu128/rtl
+BLACKPARROT_SDK_DIR ?= $(HOME)/black-parrot/bsg_fpga/vcu128/sdk
 ifeq ($(BLACKPARROT_RTL_DIR),)
 $(error "Please point BLACKPARROT_RTL_DIR to a BlackParrot directory, after running make prep")
 endif
