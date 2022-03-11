@@ -139,11 +139,12 @@ int main(int argc, char **argv)
   /* not enough arguments given? */
   if (argc < 3) {
     fprintf(stderr,
-      "\nUsage:\t%s <device> <address> [[type] data]\n"
+      "\nUsage:\t%s <device> <address> [<type> <file> <ncpus>]\n"
       "\tdevice  : character device to access\n"
       "\taddress : memory address to access\n"
       "\ttype    : access operation type : [b]yte, [h]alfword, [w]ord\n"
-      "\tdata    : data to be written for a write\n\n",
+      "\tfile    : nbf data file to write to device\n"
+      "\tncpus   : number of cpus in system\n\n",
       argv[0]);
     exit(1);
   }
@@ -227,23 +228,31 @@ int main(int argc, char **argv)
   }
   /* data value given, i.e. writing? */
   if (argc >= 5) {
+    /*
     writeval = strtoul(argv[4], 0, 0);
     printf("Write 32-bits value 0x%08x to 0x%08x (0x%p)\n",
            (unsigned int)writeval, (unsigned int)target,
            virt_addr);
+    */
     /* swap 32-bit endianess if host is not little-endian */
 
     //*((uint32_t *) virt_addr) = htoll(writeval);
     uint32_t * virt_addr_ptr = (uint32_t *) virt_addr;
     uint32_t * load_addr_ptr = (uint32_t *) (map_base + 0x00000020);
 
+    int num_cores = 1;
+    if (argc >= 6) {
+      num_cores = atoi(argv[5]);
+      printf("Number of cores: %d\n", num_cores);
+    }
+
     FILE *fp;
     char str[16];
-    char* filename = argv[5];
+    char* filename = argv[4];
 
     fp = fopen(filename, "r");
     if (fp == NULL){
-        printf("Could not open file %s",filename);
+        printf("Could not open file %s\n",filename);
         return 1;
     }
     while (fgets(str, 16, fp) != NULL){
@@ -258,7 +267,6 @@ int main(int argc, char **argv)
     uint32_t * map_base_ptr = (uint32_t *) map_base;
 
     int counter = 0;
-    const int num_cores = 1;
 
     struct Queue* queue = createQueue();
     pthread_t thread_id;

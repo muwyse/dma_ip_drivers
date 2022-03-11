@@ -59,6 +59,8 @@ endif
 %.word: %.nbf
 	python nbf_to_word.py $< > $@
 
+# args: device address w nbf_file NCPUS
+# w means write
 %.run: %.word nbf
-	sudo ./nbf /dev/xdma0_user 0x10 w 0x1 $<
+	sudo ./nbf /dev/xdma0_user 0x10 w $< $(NCPUS)
 
