@@ -47,7 +47,10 @@ NCPUS ?= 1
 	$(RISCV_OBJCOPY) -O verilog $< $@
 
 %.nbf: %.mem
-	python $(NBF_PY) --ncpus $(NCPUS) --config --ucode $(UCODE) --mem $< > $@
+	sed -i "s/@8/@0/g" $<
+	python $(NBF_PY) --ncpus $(NCPUS) --config --mem $< > $@
+
+#python $(NBF_PY) --ncpus $(NCPUS) --config --ucode $(UCODE) --mem $< > $@
 
 %.word: %.nbf
 	python nbf_to_word.py $< > $@
