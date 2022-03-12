@@ -37,8 +37,14 @@ endif
 
 RISCV_OBJCOPY  ?= $(BLACKPARROT_SDK_DIR)/install/bin/riscv64-unknown-linux-gnu-objcopy
 NBF_PY ?= $(BLACKPARROT_RTL_DIR)/bp_common/software/py/nbf.py
-UCODE ?= $(BLACKPARROT_SDK_DIR)/bedrock/roms/mesi.mem
 NCPUS ?= 1
+UCODE ?= 0
+UCODE_MEM ?= $(BLACKPARROT_SDK_DIR)/bedrock/roms/moesif.mem
+
+NBF_INPUTS ?= --ncpus $(NCPUS) --config --mem
+ifeq ($(UCODE),1)
+NBF_INPUTS += --ucode $(UCODE_MEM)
+endif
 
 %.riscv:
 	cp $(BLACKPARROT_SDK_DIR)/prog/*/$@ $@
@@ -48,9 +54,7 @@ NCPUS ?= 1
 
 %.nbf: %.mem
 	sed -i "s/@8/@0/g" $<
-	python $(NBF_PY) --ncpus $(NCPUS) --config --mem $< > $@
-
-#python $(NBF_PY) --ncpus $(NCPUS) --config --ucode $(UCODE) --mem $< > $@
+	python $(NBF_PY) $(NBF_INPUTS) $< > $@
 
 %.word: %.nbf
 	python nbf_to_word.py $< > $@
