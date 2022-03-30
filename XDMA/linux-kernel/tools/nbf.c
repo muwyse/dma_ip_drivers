@@ -262,6 +262,7 @@ int main(int argc, char **argv)
         *virt_addr_ptr = htoll(word);
     }
     fclose(fp);
+    printf("NBF load complete: %s\n",filename);
 
     // mmio host program
     uint32_t * map_base_ptr = (uint32_t *) map_base;

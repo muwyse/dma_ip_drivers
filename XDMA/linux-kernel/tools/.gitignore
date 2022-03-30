@@ -4,3 +4,4 @@
 *.word
 nbf
 nbf.o
+*.log
