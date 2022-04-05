@@ -41,10 +41,11 @@ NCPUS ?= 1
 UCODE ?= 0
 UCODE_MEM ?= $(BLACKPARROT_SDK_DIR)/bedrock/roms/moesif.mem
 
-NBF_INPUTS ?= --ncpus $(NCPUS) --config --mem
+NBF_INPUTS ?= --ncpus $(NCPUS) --config
 ifeq ($(UCODE),1)
 NBF_INPUTS += --ucode $(UCODE_MEM)
 endif
+NBF_INPUTS += --mem
 
 %.riscv:
 	cp $(BLACKPARROT_SDK_DIR)/prog/*/$@ $@
