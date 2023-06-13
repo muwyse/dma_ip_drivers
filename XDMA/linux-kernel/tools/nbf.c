@@ -132,17 +132,14 @@ int main(int argc, char **argv)
   void *map_base, *virt_addr;
   uint32_t read_result, writeval, addr_result, data_result;
   off_t target;
-  /* access width */
-  int access_width = 'w';
   char *device;
 
   /* not enough arguments given? */
-  if (argc < 3) {
+  if (argc != 5) {
     fprintf(stderr,
-      "\nUsage:\t%s <device> <address> [<type> <file> <ncpus>]\n"
+      "\nUsage:\t%s <device> <address> <file> <ncpus>\n"
       "\tdevice  : character device to access\n"
       "\taddress : memory address to access\n"
-      "\ttype    : access operation type : [b]yte, [h]alfword, [w]ord\n"
       "\tfile    : nbf data file to write to device\n"
       "\tncpus   : number of cpus in system\n\n",
       argv[0]);
@@ -156,25 +153,7 @@ int main(int argc, char **argv)
   target = strtoul(argv[2], 0, 0);
   printf("address: 0x%08x\n", (unsigned int)target);
 
-  printf("access type: %s\n", argc >= 4 ? "write" : "read");
-
-  /* data given? */
-  if (argc >= 4) {
-    printf("access width given.\n");
-    access_width = tolower(argv[3][0]);
-  }
-  printf("access width: ");
-  if (access_width == 'b')
-    printf("byte (8-bits)\n");
-  else if (access_width == 'h')
-    printf("half word (16-bits)\n");
-  else if (access_width == 'w')
-    printf("word (32-bits)\n");
-  else {
-    printf("word (32-bits)\n");
-    access_width = 'w';
-  }
-
+  // open /dev/xdma0_user
   if ((fd = open(argv[1], O_RDWR | O_SYNC)) == -1)
     FATAL;
   printf("character device %s opened.\n", argv[1]);
@@ -187,145 +166,121 @@ int main(int argc, char **argv)
   printf("Memory mapped at address %p.\n", map_base);
   fflush(stdout);
 
-  /* calculate the virtual address to be accessed */
-  virt_addr = map_base + target;
-  /* read only */
-  if (argc <= 4) {
-    //printf("Read from address %p.\n", virt_addr);
-    switch (access_width) {
-    case 'b':
-      read_result = *((uint8_t *) virt_addr);
-      printf
-          ("Read 8-bits value at address 0x%08x (%p): 0x%02x\n",
-           (unsigned int)target, virt_addr,
-           (unsigned int)read_result);
-      break;
-    case 'h':
-      read_result = *((uint16_t *) virt_addr);
-      /* swap 16-bit endianess if host is not little-endian */
-      read_result = ltohs(read_result);
-      printf
-          ("Read 16-bit value at address 0x%08x (%p): 0x%04x\n",
-           (unsigned int)target, virt_addr,
-           (unsigned int)read_result);
-      break;
-    case 'w':
-      read_result = *((uint32_t *) virt_addr);
-      /* swap 32-bit endianess if host is not little-endian */
-      read_result = ltohl(read_result);
-      printf
-          ("Read 32-bit value at address 0x%08x (%p): 0x%08x\n",
-           (unsigned int)target, virt_addr,
-           (unsigned int)read_result);
-      return (int)read_result;
-      break;
-    default:
-      fprintf(stderr, "Illegal data type '%c'.\n",
-        access_width);
-      exit(2);
-    }
-    fflush(stdout);
+  // Read addresses
+  // buffer overloads same address as nbf_write_ptr, but is on AR channel
+  // whereas NBF is on AW/W channel
+  uint32_t * buffer_count = (uint32_t *) (map_base);
+  uint32_t * buffer = (uint32_t *) (map_base + 0x00000010);
+  // nbf_write_ptr is writes to NBF loader
+  uint32_t * nbf_write_ptr = (uint32_t *) (map_base + 0x00000010);
+  // mmio_write_ptr is MMIO, used primarily to read from BP I/O out
+  uint32_t * mmio_write_ptr = (uint32_t *) (map_base + 0x00000020);
+
+  int num_cores = 1;
+  if (argc >= 6) {
+    num_cores = atoi(argv[5]);
+    printf("Number of cores: %d\n", num_cores);
   }
-  /* data value given, i.e. writing? */
-  if (argc >= 5) {
-    /*
-    writeval = strtoul(argv[4], 0, 0);
-    printf("Write 32-bits value 0x%08x to 0x%08x (0x%p)\n",
-           (unsigned int)writeval, (unsigned int)target,
-           virt_addr);
-    */
-    /* swap 32-bit endianess if host is not little-endian */
 
-    //*((uint32_t *) virt_addr) = htoll(writeval);
-    uint32_t * virt_addr_ptr = (uint32_t *) virt_addr;
-    uint32_t * load_addr_ptr = (uint32_t *) (map_base + 0x00000020);
+  // read NBF file given on command line
+  // write every NBF file line (32b each) to NBF loader
+  // this sends an NBF command of form "cmd_address_[data_hi, data_lo]"
+  // the order is: data_lo, data_hi, address, address_msb+cmd
+  // data is 64b total, address is 40b and cmd is 8b
+  FILE *fp;
+  char str[16];
+  char* filename = argv[4];
 
-    int num_cores = 1;
-    if (argc >= 6) {
-      num_cores = atoi(argv[5]);
-      printf("Number of cores: %d\n", num_cores);
-    }
+  fp = fopen(filename, "r");
+  if (fp == NULL){
+      printf("Could not open file %s\n",filename);
+      return 1;
+  }
+  while (fgets(str, 16, fp) != NULL){
+      uint32_t word = (uint32_t)strtol(str, NULL, 16);
+      //printf("%08x\n", word);
+      //printf("%s", str);
+      *nbf_write_ptr = htoll(word);
+  }
+  fclose(fp);
+  printf("NBF load complete: %s\n",filename);
 
-    FILE *fp;
-    char str[16];
-    char* filename = argv[4];
+  int counter = 0;
 
-    fp = fopen(filename, "r");
-    if (fp == NULL){
-        printf("Could not open file %s\n",filename);
-        return 1;
-    }
-    while (fgets(str, 16, fp) != NULL){
-        uint32_t word = (uint32_t)strtol(str, NULL, 16);
-        //printf("%08x\n", word);
-        //printf("%s", str);
-        *virt_addr_ptr = htoll(word);
-    }
-    fclose(fp);
-    printf("NBF load complete: %s\n",filename);
+  struct Queue* queue = createQueue();
+  pthread_t thread_id;
+  pthread_create(&thread_id, NULL, getCharThread, (void *)queue);
 
-    // mmio host program
-    uint32_t * map_base_ptr = (uint32_t *) map_base;
+  term_init(1);
 
-    int counter = 0;
+  // TODO: are BP MMIO ops 64b or 32b. If 64b are they cracked to 2 x 32b by AXIL
+  // converters, and if so does this code need to handle those addresses?
 
-    struct Queue* queue = createQueue();
-    pthread_t thread_id;
-    pthread_create(&thread_id, NULL, getCharThread, (void *)queue);
+  while (1){
+    // check if empty by reading the buffer count
+    read_result = *buffer_count;
+    read_result = ltohl(read_result);
 
-    term_init(1);
+    // reading from BP MMIO requires two entries in the buffer
+    // bp_stream_mmio converts every BP write or read into an [address, data] pair
+    // writes do not send a response to BP
+    // reads respond with 64b of data in two writes
+    // requires that every BP MMIO address is read-only or write-only
+    if (read_result >= 2){
+        // read addr and data
+        addr_result = *buffer;
+        addr_result = ltohl(addr_result);
+        data_result = *buffer;
+        data_result = ltohl(data_result);
 
-    while (1){
-        // check if empty
-        read_result = *map_base_ptr;
-        read_result = ltohl(read_result);
-
-        if (read_result > 0){
-            // read addr and data
-            addr_result = *virt_addr_ptr;
-            addr_result = ltohl(addr_result);
-            data_result = *virt_addr_ptr;
-            data_result = ltohl(data_result);
-
+        // BP putchar to Host
+        if ((addr_result>>12) == 0x101){
+            printf("%c", data_result);
+            fflush(stdout);
+        }
+        // BP finish to host
+        else if ((addr_result>>12) == 0x102) {
             uint32_t core_id = (addr_result & 0x00000FFF) >> 3;
-            if ((addr_result>>12) == 0x101){
-                printf("%c", data_result);
-                fflush(stdout);
-            } else if ((addr_result>>12) == 0x102){
-                if (data_result == 0){
-                  printf("[CORE%0x FSH] PASS\n", core_id);
-                  printf("%0x\n", data_result);
-                } else {
-                  printf("[CORE%0x FSH] FAIL\n", core_id);
-                  printf("%0x\n", data_result);
-                }
-                fflush(stdout);
-                counter++;
-                if (counter == num_cores){
-                    break;
-                }
-            } else if ((addr_result>>12) == 0x100){
-                if (isEmpty(queue)) {
-                    *load_addr_ptr = htoll((uint32_t)0xFFFFFFFF);
-                    *load_addr_ptr = htoll((uint32_t)0xFFFFFFFF);
-                } else {
-                    *load_addr_ptr = htoll((uint32_t)(dequeue(queue)));
-                    *load_addr_ptr = htoll((uint32_t)0x00000000);
-                }
+            if (data_result == 0){
+              printf("[CORE%0x FSH] PASS\n", core_id);
+              printf("%0x\n", data_result);
             } else {
-                // Return 0 for spurious requests
-                *load_addr_ptr = htoll((uint32_t)0x00000000);
-                *load_addr_ptr = htoll((uint32_t)0x00000000);
+              printf("[CORE%0x FSH] FAIL\n", core_id);
+              printf("%0x\n", data_result);
+            }
+            fflush(stdout);
+            counter++;
+            if (counter == num_cores){
+                break;
             }
         }
+        // BP getchar from host
+        // returns 32b of data
+        else if ((addr_result>>12) == 0x100) {
+            if (isEmpty(queue)) {
+                *mmio_write_ptr = htoll((uint32_t)0xFFFFFFFF);
+            } else {
+                *mmio_write_ptr = htoll((uint32_t)(dequeue(queue)));
+            }
+        }
+        // bad request
+        else {
+            printf("Unhandled BP MMIO address %0x\n", addr_result);
+            // TODO: returning 0 seems dangerous. Might need to indicate if
+            // request is read or write from BP
+            // Return 0 for spurious requests
+            *mmio_write_ptr = htoll((uint32_t)0x00000000);
+        }
     }
-
-    term_exit();
-
-    fflush(stdout);
   }
+
+  term_exit();
+
+  fflush(stdout);
+
   if (munmap(map_base, MAP_SIZE) == -1)
     FATAL;
   close(fd);
+
   return 0;
 }
