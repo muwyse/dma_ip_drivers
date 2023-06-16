@@ -178,7 +178,7 @@ int main(int argc, char **argv)
 
   int num_cores = 1;
   if (argc >= 6) {
-    num_cores = atoi(argv[5]);
+    num_cores = atoi(argv[4]);
     printf("Number of cores: %d\n", num_cores);
   }
 
@@ -189,7 +189,7 @@ int main(int argc, char **argv)
   // data is 64b total, address is 40b and cmd is 8b
   FILE *fp;
   char str[16];
-  char* filename = argv[4];
+  char* filename = argv[3];
 
   fp = fopen(filename, "r");
   if (fp == NULL){
