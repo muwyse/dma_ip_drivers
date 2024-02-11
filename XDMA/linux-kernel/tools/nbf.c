@@ -135,13 +135,12 @@ int main(int argc, char **argv)
   char *device;
 
   /* not enough arguments given? */
-  if (argc != 5) {
+  if (argc < 3) {
     fprintf(stderr,
-      "\nUsage:\t%s <device> <address> <file> <ncpus>\n"
+      "\nUsage:\t%s <device> <file> [ncpus]\n"
       "\tdevice  : character device to access\n"
-      "\taddress : memory address to access\n"
       "\tfile    : nbf data file to write to device\n"
-      "\tncpus   : number of cpus in system\n\n",
+      "\tncpus   : [optional] number of cpus in system (default = 1)\n\n",
       argv[0]);
     exit(1);
   }
@@ -150,12 +149,10 @@ int main(int argc, char **argv)
 
   device = strdup(argv[1]);
   printf("device: %s\n", device);
-  target = strtoul(argv[2], 0, 0);
-  printf("address: 0x%08x\n", (unsigned int)target);
 
   int num_cores = 1;
-  if (argc >= 6) {
-    num_cores = atoi(argv[4]);
+  if (argc == 4) {
+    num_cores = atoi(argv[3]);
     printf("Number of cores: %d\n", num_cores);
   }
 
@@ -185,18 +182,21 @@ int main(int argc, char **argv)
 
   // read NBF file given on command line
   // write every NBF file line (32b each) to NBF loader
-  // this sends an NBF command of form "cmd_address_[data_hi, data_lo]"
-  // the order is: data_lo, data_hi, address, address_msb+cmd
-  // data is 64b total, address is 40b and cmd is 8b
+  // this sends an NBF command of form "cmd_address_data"
+  // the order is: data_lo, data_hi, address_lo, address_hi, cmd
+  // data is 64b total, address is 64b and cmd is 8b
   FILE *fp;
   char str[16];
-  char* filename = argv[3];
+  char* filename = argv[2];
 
   fp = fopen(filename, "r");
   if (fp == NULL){
       printf("Could not open file %s\n",filename);
       return 1;
   }
+
+  // TODO: NBF file can issue reads, loop needs to consume each read response before
+  // sending more commands
   while (fgets(str, 16, fp) != NULL){
       uint32_t word = (uint32_t)strtol(str, NULL, 16);
       //printf("%08x\n", word);
