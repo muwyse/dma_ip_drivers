@@ -153,34 +153,35 @@ int main(int argc, char **argv)
   target = strtoul(argv[2], 0, 0);
   printf("address: 0x%08x\n", (unsigned int)target);
 
+  int num_cores = 1;
+  if (argc >= 6) {
+    num_cores = atoi(argv[4]);
+    printf("Number of cores: %d\n", num_cores);
+  }
+
   // open /dev/xdma0_user
   if ((fd = open(argv[1], O_RDWR | O_SYNC)) == -1)
     FATAL;
   printf("character device %s opened.\n", argv[1]);
   fflush(stdout);
 
-  /* map one page */
+  // map one page
   map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (map_base == (void *)-1)
     FATAL;
   printf("Memory mapped at address %p.\n", map_base);
   fflush(stdout);
 
-  // Read addresses
-  // buffer overloads same address as nbf_write_ptr, but is on AR channel
-  // whereas NBF is on AW/W channel
-  uint32_t * buffer_count = (uint32_t *) (map_base);
-  uint32_t * buffer = (uint32_t *) (map_base + 0x00000010);
-  // nbf_write_ptr is writes to NBF loader
-  uint32_t * nbf_write_ptr = (uint32_t *) (map_base + 0x00000010);
-  // mmio_write_ptr is MMIO, used primarily to read from BP I/O out
-  uint32_t * mmio_write_ptr = (uint32_t *) (map_base + 0x00000020);
-
-  int num_cores = 1;
-  if (argc >= 6) {
-    num_cores = atoi(argv[4]);
-    printf("Number of cores: %d\n", num_cores);
-  }
+	// FPGA Host addresses
+	// software to fpga nbf command submission (write-only)
+  uint32_t * nbf_cmd_ptr = (uint32_t *) (map_base);
+	// software to fpga mmio response (write-only)
+  uint32_t * mmio_resp_ptr = (uint32_t *) (map_base + 0x004);
+	// fpga to software mmio request buffer count (read-only)
+  uint32_t * mmio_req_count_ptr = (uint32_t *) (map_base + 0x008);
+	// fpga to software mmio request buffer
+	// each request is a 32-bit address plus 32-bit data
+  uint32_t * mmio_req_ptr = (uint32_t *) (map_base + 0x00C);
 
   // read NBF file given on command line
   // write every NBF file line (32b each) to NBF loader
@@ -200,7 +201,7 @@ int main(int argc, char **argv)
       uint32_t word = (uint32_t)strtol(str, NULL, 16);
       //printf("%08x\n", word);
       //printf("%s", str);
-      *nbf_write_ptr = htoll(word);
+      *nbf_cmd_ptr = htoll(word);
   }
   fclose(fp);
   printf("NBF load complete: %s\n",filename);
@@ -213,12 +214,9 @@ int main(int argc, char **argv)
 
   term_init(1);
 
-  // TODO: are BP MMIO ops 64b or 32b. If 64b are they cracked to 2 x 32b by AXIL
-  // converters, and if so does this code need to handle those addresses?
-
   while (1){
-    // check if empty by reading the buffer count
-    read_result = *buffer_count;
+    // check if empty by reading the mmio request buffer size
+    read_result = *mmio_req_count_ptr;
     read_result = ltohl(read_result);
 
     // reading from BP MMIO requires two entries in the buffer
@@ -228,9 +226,9 @@ int main(int argc, char **argv)
     // requires that every BP MMIO address is read-only or write-only
     if (read_result >= 2){
         // read addr and data
-        addr_result = *buffer;
+        addr_result = *mmio_req_ptr;
         addr_result = ltohl(addr_result);
-        data_result = *buffer;
+        data_result = *mmio_req_ptr;
         data_result = ltohl(data_result);
 
         // BP putchar to Host
@@ -258,9 +256,9 @@ int main(int argc, char **argv)
         // returns 32b of data
         else if ((addr_result>>12) == 0x100) {
             if (isEmpty(queue)) {
-                *mmio_write_ptr = htoll((uint32_t)0xFFFFFFFF);
+                *mmio_resp_ptr = htoll((uint32_t)0xFFFFFFFF);
             } else {
-                *mmio_write_ptr = htoll((uint32_t)(dequeue(queue)));
+                *mmio_resp_ptr = htoll((uint32_t)(dequeue(queue)));
             }
         }
         // bad request
@@ -269,7 +267,7 @@ int main(int argc, char **argv)
             // TODO: returning 0 seems dangerous. Might need to indicate if
             // request is read or write from BP
             // Return 0 for spurious requests
-            *mmio_write_ptr = htoll((uint32_t)0x00000000);
+            *mmio_resp_ptr = htoll((uint32_t)0x00000000);
         }
     }
   }

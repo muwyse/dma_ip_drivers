@@ -12,7 +12,7 @@ if __name__ == "__main__":
     lines = f.readlines()
 
     # define constant
-    addr_width = 40
+    addr_width = 64
     block_size = 64
     opcode_width = 8
     total_width = addr_width + block_size + opcode_width
