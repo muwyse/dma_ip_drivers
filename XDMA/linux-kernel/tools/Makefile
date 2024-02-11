@@ -1,3 +1,18 @@
+TOP ?= $(shell git rev-parse --show-toplevel)
+
+# BlackParrot paths
+BP_SDK_DIR ?= $(abspath $(TOP)/../black-parrot-sdk)
+BP_RTL_DIR ?= $(abspath $(TOP)/../black-parrot)
+ifeq ($(BP_RTL_DIR),)
+$(error "Please point BP_RTL_DIR to a BlackParrot directory, after running make prep")
+endif
+ifeq ($(BP_SDK_DIR),)
+$(error "Please point BP_SDK_DIR to a BlackParrot directory, after running make sdk")
+endif
+
+RISCV_OBJCOPY  ?= $(BP_SDK_DIR)/install/bin/riscv64-unknown-linux-gnu-objcopy
+NBF_PY ?= $(BP_RTL_DIR)/bp_common/software/py/nbf.py
+
 CC ?= gcc
 
 all: reg_rw dma_to_device dma_from_device performance nbf
@@ -26,35 +41,29 @@ clean:
 clean_progs:
 	rm -rf *.riscv *.word *.nbf *.mem
 
-BLACKPARROT_RTL_DIR ?= $(HOME)/black-parrot/bsg_fpga/vcu128/rtl
-BLACKPARROT_SDK_DIR ?= $(HOME)/black-parrot/bsg_fpga/vcu128/sdk
-ifeq ($(BLACKPARROT_RTL_DIR),)
-$(error "Please point BLACKPARROT_RTL_DIR to a BlackParrot directory, after running make prep")
-endif
-ifeq ($(BLACKPARROT_SDK_DIR),)
-$(error "Please point BLACKPARROT_SDK_DIR to a BlackParrot directory, after running make sdk")
-endif
-
-RISCV_OBJCOPY  ?= $(BLACKPARROT_SDK_DIR)/install/bin/riscv64-unknown-linux-gnu-objcopy
-NBF_PY ?= $(BLACKPARROT_RTL_DIR)/bp_common/software/py/nbf.py
 NCPUS ?= 1
 UCODE ?= 0
-UCODE_MEM ?= $(BLACKPARROT_SDK_DIR)/bedrock/roms/moesif.mem
+UCODE_MEM ?= $(BP_SDK_DIR)/bedrock/roms/moesif.mem
+SKIP_ZEROS ?= 0
 
 NBF_INPUTS ?= --ncpus $(NCPUS) --config
 ifeq ($(UCODE),1)
 NBF_INPUTS += --ucode $(UCODE_MEM)
 endif
+ifeq ($(SKIP_ZEROS), 1)
+NBF_INPUTS += --skip-zeros
+endif
+NBF_INPUTS += --boot_pc=0x80000000
 NBF_INPUTS += --mem
 
 %.riscv:
-	cp $(BLACKPARROT_SDK_DIR)/prog/*/$@ $@
+	cp $(BP_SDK_DIR)/prog/*/$@ $@
 
 %.mem: %.riscv
 	$(RISCV_OBJCOPY) -O verilog $< $@
 
 %.nbf: %.mem
-	sed -i "s/@8/@0/g" $<
+	#sed -i "s/@8/@0/g" $<
 	python $(NBF_PY) $(NBF_INPUTS) $< > $@
 
 %.word: %.nbf
