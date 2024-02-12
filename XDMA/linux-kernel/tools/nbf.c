@@ -179,6 +179,9 @@ int main(int argc, char **argv)
 	// fpga to software mmio request buffer
 	// each request is a 32-bit address plus 32-bit data
   uint32_t * mmio_req_ptr = (uint32_t *) (map_base + 0x00C);
+  // NBF read
+  uint32_t * nbf_resp_count_ptr = (uint32_t *) (map_base + 0x010);
+  uint32_t * nbf_resp_ptr = (uint32_t *) (map_base + 0x014);
 
   // read NBF file given on command line
   // write every NBF file line (32b each) to NBF loader
@@ -195,13 +198,25 @@ int main(int argc, char **argv)
       return 1;
   }
 
-  // TODO: NBF file can issue reads, loop needs to consume each read response before
-  // sending more commands
-  while (fgets(str, 16, fp) != NULL){
-      uint32_t word = (uint32_t)strtol(str, NULL, 16);
-      //printf("%08x\n", word);
-      //printf("%s", str);
-      *nbf_cmd_ptr = htoll(word);
+  int count = 0;
+  while (fgets(str, 16, fp) != NULL) {
+    uint32_t word = (uint32_t)strtol(str, NULL, 16);
+    //printf("%08x\n", word);
+    //printf("%s", str);
+    *nbf_cmd_ptr = htoll(word);
+    if (count == 4 && word == 0x12) {
+      uint32_t resp_cnt = 0;
+      do {
+        resp_cnt = *nbf_resp_count_ptr;
+      } while (resp_cnt < 1);
+      uint32_t resp = *nbf_resp_ptr;
+      printf("NBF read: %08x\n", resp);
+      count = 0;
+    } else if (count == 4) {
+      count = 0;
+    } else {
+      count++;
+    }
   }
   fclose(fp);
   printf("NBF load complete: %s\n",filename);

@@ -72,5 +72,5 @@ NBF_INPUTS += --mem
 # args: device nbf_file NCPUS
 # w means write
 %.run: %.word nbf
-	sudo ./nbf /dev/xdma0_user $< $(NCPUS)
+	sudo ./nbf /dev/xdma0_user $< $(NCPUS) 2>&1 | tee -i run.log
 
