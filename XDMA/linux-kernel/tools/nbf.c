@@ -198,12 +198,19 @@ int main(int argc, char **argv)
       return 1;
   }
 
+  volatile int nbf_heartbeat = 0;
   int count = 0;
   while (fgets(str, 16, fp) != NULL) {
     uint32_t word = (uint32_t)strtol(str, NULL, 16);
     //printf("%08x\n", word);
     //printf("%s", str);
     *nbf_cmd_ptr = htoll(word);
+    if (count == 4) {
+      nbf_heartbeat++;
+      if (nbf_heartbeat % 10000 == 0) {
+        printf("NBF heartbeat %d\n", nbf_heartbeat);
+      }
+    }
     if (count == 4 && word == 0x12) {
       uint32_t resp_cnt = 0;
       do {

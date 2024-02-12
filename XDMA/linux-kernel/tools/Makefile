@@ -45,14 +45,16 @@ NCPUS ?= 1
 UCODE ?= 0
 UCODE_MEM ?= $(BP_SDK_DIR)/bedrock/roms/moesif.mem
 SKIP_ZEROS ?= 0
+MEM_SIZE ?= 64
 
 NBF_INPUTS ?= --ncpus $(NCPUS) --config
 ifeq ($(UCODE),1)
 NBF_INPUTS += --ucode $(UCODE_MEM)
 endif
 ifeq ($(SKIP_ZEROS), 1)
-NBF_INPUTS += --skip-zeros
+NBF_INPUTS += --skip_zeros
 endif
+NBF_INPUTS += --mem_size=$(MEM_SIZE)
 NBF_INPUTS += --boot_pc=0x80000000
 NBF_INPUTS += --mem
 
@@ -63,7 +65,7 @@ NBF_INPUTS += --mem
 	$(RISCV_OBJCOPY) -O verilog $< $@
 
 %.nbf: %.mem
-	#sed -i "s/@8/@0/g" $<
+	sed -i "s/@8/@0/g" $<
 	python $(NBF_PY) $(NBF_INPUTS) $< > $@
 
 %.word: %.nbf
