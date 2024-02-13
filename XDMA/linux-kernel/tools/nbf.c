@@ -244,6 +244,9 @@ int main(int argc, char **argv)
 
   term_init(1);
 
+  volatile long int poll_cnt = 0;
+  long int poll_timeout = 1000000;
+
   while (1){
     // check if empty by reading the mmio request buffer size
     read_result = *mmio_req_count_ptr;
@@ -255,6 +258,7 @@ int main(int argc, char **argv)
     // reads respond with 64b of data in two writes
     // requires that every BP MMIO address is read-only or write-only
     if (read_result >= 2){
+        poll_cnt = 0;
         // read addr and data
         addr_result = *mmio_req_ptr;
         addr_result = ltohl(addr_result);
@@ -299,6 +303,11 @@ int main(int argc, char **argv)
             // Return 0 for spurious requests
             *mmio_resp_ptr = htoll((uint32_t)0x00000000);
         }
+    } else {
+      poll_cnt++;
+      if (poll_cnt % poll_timeout == 0) {
+        printf("host poll timeout: %ld\n", poll_cnt);
+      }
     }
   }
 
