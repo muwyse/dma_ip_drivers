@@ -135,12 +135,13 @@ int main(int argc, char **argv)
   char *device;
 
   /* not enough arguments given? */
-  if (argc < 3) {
+  if (argc < 4) {
     fprintf(stderr,
-      "\nUsage:\t%s <device> <file> [ncpus]\n"
+      "\nUsage:\t%s <device> <file> ncpus\n"
       "\tdevice  : character device to access\n"
       "\tfile    : nbf data file to write to device\n"
-      "\tncpus   : [optional] number of cpus in system (default = 1)\n\n",
+      "\tncpus   : number of cpus in system (default = 1)\n"
+      "\tzero    : [optional] if present, stop after loading nbf (default = false)\n\n",
       argv[0]);
     exit(1);
   }
@@ -151,9 +152,12 @@ int main(int argc, char **argv)
   printf("device: %s\n", device);
 
   int num_cores = 1;
-  if (argc == 4) {
-    num_cores = atoi(argv[3]);
-    printf("Number of cores: %d\n", num_cores);
+  num_cores = atoi(argv[3]);
+  printf("Number of cores: %d\n", num_cores);
+
+  int zero_only = 0;
+  if (argc == 5) {
+    zero_only = 1;
   }
 
   // open /dev/xdma0_user
@@ -207,7 +211,7 @@ int main(int argc, char **argv)
     *nbf_cmd_ptr = htoll(word);
     if (count == 4) {
       nbf_heartbeat++;
-      if (nbf_heartbeat % 10000 == 0) {
+      if (nbf_heartbeat % 1000000 == 0) {
         printf("NBF heartbeat %d\n", nbf_heartbeat);
       }
     }
@@ -227,6 +231,10 @@ int main(int argc, char **argv)
   }
   fclose(fp);
   printf("NBF load complete: %s\n",filename);
+
+  if (zero_only) {
+    return 0;
+  }
 
   int counter = 0;
 
