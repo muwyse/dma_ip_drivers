@@ -2,6 +2,7 @@
 *.mem
 *.nbf
 *.word
+*.dump
 nbf
 nbf.o
 *.log
