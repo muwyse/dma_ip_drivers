@@ -138,13 +138,13 @@ int main(int argc, char **argv)
   if (argc < 4) {
     fprintf(stderr,
       "\nUsage:\t%s <device> run [file] [ncpus]\n"
-      "\nUsage:\t%s <device> zero [memory_size]\n"
+      "Usage:\t%s <device> zero [memory_size]\n"
       "\tdevice  : character device to access\n"
       "\tmode    : 'run' or 'zero'\n"
       "\tfile    : nbf data file to write to device\n"
       "\tncpus   : number of cpus in system (default = 1)\n"
       "\tmemory_size : size of memory in MB to zero\n\n",
-      argv[0]);
+      argv[0], argv[0]);
     exit(1);
   }
 
