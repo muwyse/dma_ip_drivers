@@ -137,11 +137,13 @@ int main(int argc, char **argv)
   /* not enough arguments given? */
   if (argc < 4) {
     fprintf(stderr,
-      "\nUsage:\t%s <device> <file> ncpus\n"
+      "\nUsage:\t%s <device> run [file] [ncpus]\n"
+      "\nUsage:\t%s <device> zero [memory_size]\n"
       "\tdevice  : character device to access\n"
+      "\tmode    : 'run' or 'zero'\n"
       "\tfile    : nbf data file to write to device\n"
       "\tncpus   : number of cpus in system (default = 1)\n"
-      "\tzero    : [optional] if present, stop after loading nbf (default = false)\n\n",
+      "\tmemory_size : size of memory in MB to zero\n\n",
       argv[0]);
     exit(1);
   }
@@ -151,14 +153,9 @@ int main(int argc, char **argv)
   device = strdup(argv[1]);
   printf("device: %s\n", device);
 
-  int num_cores = 1;
-  num_cores = atoi(argv[3]);
-  printf("Number of cores: %d\n", num_cores);
-
-  int zero_only = 0;
-  if (argc == 5) {
-    zero_only = 1;
-  }
+  char* mode;
+  mode = strdup(argv[2]);
+  printf("mode: %s\n", mode);
 
   // open /dev/xdma0_user
   if ((fd = open(argv[1], O_RDWR | O_SYNC)) == -1)
@@ -187,6 +184,35 @@ int main(int argc, char **argv)
   uint32_t * nbf_resp_count_ptr = (uint32_t *) (map_base + 0x010);
   uint32_t * nbf_resp_ptr = (uint32_t *) (map_base + 0x014);
 
+
+  // Zero mode
+  // send 64b write NBF commands to zero memory starting at DRAM base (0x80000000)
+  // for the memory_size provided by the user
+  if (!strcmp(mode, "zero")) {
+    uint64_t memory_size = 64;
+    if (argc > 3) {
+      memory_size = atol(argv[3]);
+    }
+    printf("zeroing memory, %lu MiB\n", memory_size);
+    uint64_t addr = 0x80000000;
+    uint64_t high_addr = addr + (memory_size * 1024 * 1024);
+    for (; addr < high_addr; addr += 8) {
+      // data
+      *nbf_cmd_ptr = htoll((uint32_t)0x0);
+      *nbf_cmd_ptr = htoll((uint32_t)0x0);
+      // address
+      *nbf_cmd_ptr = htoll((uint32_t)addr);
+      *nbf_cmd_ptr = htoll((uint32_t)(addr >> 32));
+      // cmd = 0x3 = 64b write
+      *nbf_cmd_ptr = htoll((uint32_t)0x3);
+    }
+    goto _main_done;
+  }
+
+  if (!strcmp(mode, "run")) {
+    printf("loading and running from nbf\n");
+  }
+
   // read NBF file given on command line
   // write every NBF file line (32b each) to NBF loader
   // this sends an NBF command of form "cmd_address_data"
@@ -194,13 +220,17 @@ int main(int argc, char **argv)
   // data is 64b total, address is 64b and cmd is 8b
   FILE *fp;
   char str[16];
-  char* filename = argv[2];
+  char* filename = argv[3];
 
   fp = fopen(filename, "r");
   if (fp == NULL){
       printf("Could not open file %s\n",filename);
       return 1;
   }
+
+  int num_cores = 1;
+  num_cores = atoi(argv[4]);
+  printf("Number of cores: %d\n", num_cores);
 
   volatile int nbf_heartbeat = 0;
   int count = 0;
@@ -231,10 +261,6 @@ int main(int argc, char **argv)
   }
   fclose(fp);
   printf("NBF load complete: %s\n",filename);
-
-  if (zero_only) {
-    return 0;
-  }
 
   int counter = 0;
 
@@ -313,6 +339,7 @@ int main(int argc, char **argv)
 
   term_exit();
 
+_main_done:
   fflush(stdout);
 
   if (munmap(map_base, MAP_SIZE) == -1)
