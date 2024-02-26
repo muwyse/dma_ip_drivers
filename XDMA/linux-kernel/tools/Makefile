@@ -43,26 +43,40 @@ clean:
 clean_progs:
 	rm -rf *.riscv *.word *.nbf *.mem
 
-NCPUS ?= 1
-UCODE ?= 0
-UCODE_MEM ?= $(BP_SDK_DIR)/bedrock/roms/moesif.mem
-SKIP_ZEROS ?= 1
-MEM_SIZE ?= 256
-CONFIG ?= 0
+NBF_NCPUS ?= 1
+NBF_MEM_SIZE ?= 256
+NBF_BOOTROM ?= bootrom.mem
+NBF_BOOTROM_SIZE ?= 64
+NBF_UCODE ?=
+NBF_SKIP_ZEROS ?= 1
+NBF_BOOT_PC ?=
+NBF_CONFIG ?= 0
+NBF_DEBUG ?= 1
+NBF_VERIFY ?= 0
 
-NBF_INPUTS ?= --ncpus $(NCPUS)
-ifeq ($(UCODE),1)
-NBF_INPUTS += --ucode $(UCODE_MEM)
+#NBF_UCODE_MEM ?= $(BP_SDK_DIR)/bedrock/roms/moesif.mem
+
+NBF_FLAGS ?= --ncpus $(NBF_NCPUS) --data_width 64
+NBF_FLAGS += --bootrom bootrom.mem --bootrom_size $(NBF_BOOTROM_SIZE)
+ifneq ($(NBF_UCODE),)
+NBF_FLAGS += --ucode $(NBF_UCODE)
 endif
-ifeq ($(SKIP_ZEROS), 1)
-NBF_INPUTS += --skip_zeros
+ifneq ($(NBF_BOOT_PC),)
+NBF_FLAGS += --boot_pc $(NBF_BOOT_PC)
 endif
-ifneq ($(CONFIG), 0)
-NBF_INPUTS += --config
+ifeq ($(NBF_SKIP_ZEROS), 1)
+NBF_FLAGS += --skip_zeros
 endif
-NBF_INPUTS += --mem_size=$(MEM_SIZE)
-#NBF_INPUTS += --boot_pc=0x80000000
-NBF_INPUTS += --bootrom bootrom.mem
+ifeq ($(NBF_CONFIG), 1)
+NBF_FLAGS += --config
+endif
+ifeq ($(NBF_DEBUG), 1)
+NBF_FLAGS += --debug
+endif
+ifeq ($(NBF_VERIFY), 1)
+NBF_FLAGS += --verify
+endif
+NBF_FLAGS += --mem_size=$(NBF_MEM_SIZE)
 
 %.riscv:
 	cp $(BP_SDK_DIR)/prog/*/$@ $@
@@ -74,14 +88,11 @@ NBF_INPUTS += --bootrom bootrom.mem
 	$(RISCV_OBJDUMP) -D $< > $@
 
 %.nbf: %.mem bootrom.mem
-	#sed -i "s/@8/@0/g" $<
-	python $(NBF_PY) $(NBF_INPUTS) --mem $< > $@
+	python $(NBF_PY) $(NBF_FLAGS) --mem $< > $@
 
 %.word: %.nbf
 	python nbf_to_word.py $< > $@
 
-# args: device nbf_file NCPUS
-# w means write
 %.run: %.word nbf
-	sudo ./nbf /dev/xdma0_user $< $(NCPUS) 2>&1 | tee -i run.log
+	sudo ./nbf /dev/xdma0_user run $< $(NBF_NCPUS) 2>&1 | tee -i run.log
 
