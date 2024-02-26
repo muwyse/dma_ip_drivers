@@ -46,8 +46,8 @@ clean_progs:
 NCPUS ?= 1
 UCODE ?= 0
 UCODE_MEM ?= $(BP_SDK_DIR)/bedrock/roms/moesif.mem
-SKIP_ZEROS ?= 0
-MEM_SIZE ?= 64
+SKIP_ZEROS ?= 1
+MEM_SIZE ?= 256
 CONFIG ?= 0
 
 NBF_INPUTS ?= --ncpus $(NCPUS)
@@ -63,7 +63,6 @@ endif
 NBF_INPUTS += --mem_size=$(MEM_SIZE)
 #NBF_INPUTS += --boot_pc=0x80000000
 NBF_INPUTS += --bootrom bootrom.mem
-NBF_INPUTS += --mem
 
 %.riscv:
 	cp $(BP_SDK_DIR)/prog/*/$@ $@
@@ -76,7 +75,7 @@ NBF_INPUTS += --mem
 
 %.nbf: %.mem bootrom.mem
 	#sed -i "s/@8/@0/g" $<
-	python $(NBF_PY) $(NBF_INPUTS) $< > $@
+	python $(NBF_PY) $(NBF_INPUTS) --mem $< > $@
 
 %.word: %.nbf
 	python nbf_to_word.py $< > $@
