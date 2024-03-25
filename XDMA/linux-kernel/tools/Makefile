@@ -58,7 +58,7 @@ NBF_START_CACHED ?= 1
 #NBF_UCODE_MEM ?= $(BP_SDK_DIR)/bedrock/roms/moesif.mem
 
 NBF_FLAGS ?= --ncpus $(NBF_NCPUS) --data_width 64
-NBF_FLAGS += --bootrom bootrom.mem --bootrom_size $(NBF_BOOTROM_SIZE)
+NBF_FLAGS += --bootrom $(NBF_BOOTROM) --bootrom_size $(NBF_BOOTROM_SIZE)
 ifneq ($(NBF_UCODE),)
 NBF_FLAGS += --ucode $(NBF_UCODE)
 endif
@@ -91,7 +91,7 @@ NBF_FLAGS += --mem_size=$(NBF_MEM_SIZE)
 %.dump: %.riscv
 	$(RISCV_OBJDUMP) -D $< > $@
 
-%.nbf: %.mem bootrom.mem
+%.nbf: %.mem $(NBF_BOOTROM)
 	python $(NBF_PY) $(NBF_FLAGS) --mem $< > $@
 
 %.word: %.nbf
