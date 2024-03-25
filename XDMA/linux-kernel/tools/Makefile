@@ -53,6 +53,7 @@ NBF_BOOT_PC ?=
 NBF_CONFIG ?= 0
 NBF_DEBUG ?= 1
 NBF_VERIFY ?= 0
+NBF_START_CACHED ?= 1
 
 #NBF_UCODE_MEM ?= $(BP_SDK_DIR)/bedrock/roms/moesif.mem
 
@@ -75,6 +76,9 @@ NBF_FLAGS += --debug
 endif
 ifeq ($(NBF_VERIFY), 1)
 NBF_FLAGS += --verify
+endif
+ifeq ($(NBF_START_CACHED), 1)
+NBF_FLAGS += --start_cached
 endif
 NBF_FLAGS += --mem_size=$(NBF_MEM_SIZE)
 
