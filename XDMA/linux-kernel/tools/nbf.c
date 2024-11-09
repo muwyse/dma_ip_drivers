@@ -321,6 +321,25 @@ int main(int argc, char **argv)
                 *mmio_resp_ptr = htoll((uint32_t)(dequeue(queue)));
             }
         }
+        // Param ROM
+        // only supports PARAM_CC_X_DIM and PARAM_CC_Y_DIM
+        else if ((addr_result>>12) == 0x120) {
+          uint32_t offset = (addr_result & 0x00000FFF);
+          // PARAM_CC_X_DIM, returns total number of cores
+          // assumption is that this is only used by BP to compute total number of cores
+          // by multiplying by PARAM_CC_Y_DIM, which will return 1
+          if (offset == 0x0) {
+            *mmio_resp_ptr = htoll((uint32_t)num_cores);
+          }
+          // PARAM_CC_Y_DIM, returns 1
+          else if (offset == 0x4) {
+            *mmio_resp_ptr = htoll((uint32_t)0x1);
+          }
+          // all others, return 0
+          else {
+            *mmio_resp_ptr = htoll((uint32_t)0x0);
+          }
+        }
         // bad request
         else {
             printf("Unhandled BP MMIO address %0x\n", addr_result);
