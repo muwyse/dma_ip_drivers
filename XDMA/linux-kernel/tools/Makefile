@@ -41,11 +41,11 @@ clean:
 	rm -rf reg_rw *.o *.bin dma_to_device dma_from_device performance nbf
 
 clean_progs:
-	rm -rf *.riscv *.word *.nbf *.mem
+	rm -rf *.riscv *.word *.nbf *.mem *.dump
 
 NBF_NCPUS ?= 1
 NBF_MEM_SIZE ?= 256
-NBF_BOOTROM ?= bootrom.mem
+NBF_BOOTROM ?= bootrom.$(COH_PROTO).mem
 NBF_BOOTROM_SIZE ?= 64
 NBF_UCODE ?=
 NBF_SKIP_ZEROS ?= 1
@@ -55,7 +55,7 @@ NBF_DEBUG ?= 1
 NBF_VERIFY ?= 0
 NBF_START_CACHED ?= 1
 
-#NBF_UCODE_MEM ?= $(BP_SDK_DIR)/bedrock/roms/moesif.mem
+COH_PROTO ?= none
 
 NBF_FLAGS ?= --ncpus $(NBF_NCPUS) --data_width 64
 NBF_FLAGS += --bootrom $(NBF_BOOTROM) --bootrom_size $(NBF_BOOTROM_SIZE)
@@ -82,6 +82,13 @@ NBF_FLAGS += --start_cached
 endif
 NBF_FLAGS += --mem_size=$(NBF_MEM_SIZE)
 
+bootrom.%.riscv: $(BP_SDK_DIR)/prog/bootrom/bootrom.%.riscv
+	cp $< $@
+
+#BOOTROM_RISCV ?= $(BP_SDK_DIR)/prog/bootrom/bootrom.$(COH_PROTO).riscv
+#bootrom.riscv: $(BOOTROM_RISCV)
+#	cp $< $@
+
 %.riscv:
 	cp $(BP_SDK_DIR)/prog/*/$@ $@
 
@@ -89,7 +96,7 @@ NBF_FLAGS += --mem_size=$(NBF_MEM_SIZE)
 	$(RISCV_OBJCOPY) -O verilog $< $@
 
 %.dump: %.riscv
-	$(RISCV_OBJDUMP) -D $< > $@
+	$(RISCV_OBJDUMP) -D -t $< > $@
 
 %.nbf: %.mem $(NBF_BOOTROM)
 	python $(NBF_PY) $(NBF_FLAGS) --mem $< > $@
@@ -99,4 +106,12 @@ NBF_FLAGS += --mem_size=$(NBF_MEM_SIZE)
 
 %.run: %.word nbf
 	sudo ./nbf /dev/xdma0_user run $< $(NBF_NCPUS) 2>&1 | tee -i run.log
+
+PROG ?= hello_world
+
+$(PROG).$(NBF_NCPUS).$(COH_PROTO).nbf: $(PROG).mem $(NBF_BOOTROM)
+	python $(NBF_PY) $(NBF_FLAGS) --mem $< > $@
+
+$(PROG).$(NBF_NCPUS).$(COH_PROTO).word: $(PROG).$(NBF_NCPUS).$(COH_PROTO).nbf
+program: $(PROG).$(NBF_NCPUS).$(COH_PROTO).word
 
